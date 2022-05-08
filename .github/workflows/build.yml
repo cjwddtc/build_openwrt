@@ -1,0 +1,102 @@
+# This is a basic workflow to help you get started with Actions
+
+name: CI
+
+# Controls when the workflow will run
+on:
+  # Triggers the workflow on push or pull request events but only for the main branch
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+  schedule:
+    - cron: 0 3 * * *
+  watch:
+    types: started
+    
+env:
+  REPO_URL: https://github.com/coolsnowwolf/lede
+  REPO_BRANCH: master
+  CONFIG_FILE: configs/lean/lean_stable.config
+  DIY_SH: scripts/lean.sh
+  KMODS_IN_FIRMWARE: true
+  UPLOAD_RELEASE: true
+  TZ: Asia/Shanghai
+  
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  # This workflow contains a single job called "build"
+  build:
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - uses: actions/checkout@v3
+
+      # Runs a single command using the runners shell
+      - name: init
+        run: echo Hello, world!
+
+      # Runs a set of commands using the runners shell
+      - name: Run a multi-line script
+        run: |
+          sudo apt update -y
+          sudo apt full-upgrade -y
+          sudo apt install -y ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential \
+          bzip2 ccache cmake cpio curl device-tree-compiler fastjar flex gawk gettext gcc-multilib g++-multilib \
+          git gperf haveged help2man intltool libc6-dev-i386 libelf-dev libglib2.0-dev libgmp3-dev libltdl-dev \
+          libmpc-dev libmpfr-dev libncurses5-dev libncursesw5-dev libreadline-dev libssl-dev libtool lrzsz
+        
+          mkisofs msmtp nano ninja-build p7zip p7zip-full patch pkgconf python2.7 python3 python3-pip qemu-utils \
+          rsync scons squashfs-tools subversion swig texinfo uglifyjs upx-ucl unzip vim wget xmlto xxd zlib1g-dev
+      - name: Clone Source Code
+        run: |
+          df -hT $PWD
+          git config --global user.email "git@github.com"
+          git config --global user.name "GitHub"
+          git clone $REPO_URL -b $REPO_BRANCH openwrt
+          cd openwrt
+          
+      - name: Update Feeds
+        id: update
+        run: |
+          cd openwrt
+          echo "OPENWRTROOT=$PWD" >> $GITHUB_ENV
+          echo "::set-output name=OPENWRTROOT::$(echo $PWD)"
+          echo "src-git openclash https://github.com/vernesong/OpenClash.git" >> feeds.conf.default
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+          cp ../diy.config .config
+          make defconfig
+          make oldconfig
+          
+      - name: Compile Packages
+        id: compile
+        run: |
+          make V=sc -j
+          
+      - name: Generate release tag
+        id: tag
+        if: env.UPLOAD_RELEASE == 'true' && !cancelled()
+        run: |
+            echo "::set-output name=release_tag::$(date +"%Y.%m.%d")-openwrt"
+            echo "::set-output name=release_date::$(date +"%Y.%m.%d")"
+            touch release.txt
+            echo "后台地址：192.168.11.1" >> release.txt
+            echo "::set-output name=status::success"
+          
+      - name: Upload firmware to release
+        uses: softprops/action-gh-release@v1
+        if: steps.tag.outputs.status == 'success' && !cancelled()
+        env:
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+            name: ${{ steps.tag.outputs.release_date }} openwrt
+            tag_name: ${{ steps.tag.outputs.release_tag }}
+            body_path: release.txt
+            files: bin/targets/x86/64/openwrt-x86-64-generic-ext4-combined.img
