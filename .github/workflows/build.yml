@@ -20,8 +20,6 @@ on:
 env:
   REPO_URL: https://github.com/coolsnowwolf/lede
   REPO_BRANCH: master
-  CONFIG_FILE: configs/lean/lean_stable.config
-  DIY_SH: scripts/lean.sh
   KMODS_IN_FIRMWARE: true
   UPLOAD_RELEASE: true
   TZ: Asia/Shanghai
@@ -70,7 +68,7 @@ jobs:
           echo "src-git openclash https://github.com/vernesong/OpenClash.git" >> feeds.conf.default
           ./scripts/feeds update -a
           ./scripts/feeds install -a
-          cp ../diy.config .config
+          cp ../passwall.config .config
           make defconfig
           make oldconfig
           
@@ -86,7 +84,7 @@ jobs:
             echo "::set-output name=release_tag::$(date +"%Y.%m.%d")-openwrt"
             echo "::set-output name=release_date::$(date +"%Y.%m.%d")"
             touch release.txt
-            echo "后台地址：192.168.11.1" >> release.txt
+            echo "后台地址：192.168.2.1" >> release.txt
             echo "::set-output name=status::success"
           
       - name: Upload firmware to release
