@@ -72,10 +72,6 @@ jobs:
           cp ../passwall.config .config
           make defconfig
           make oldconfig
-          
-      - name: Compile Packages
-        id: compile
-        run: |
           make V=sc -j
           
       - name: Generate release tag
