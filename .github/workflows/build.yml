@@ -56,7 +56,7 @@ jobs:
           cp ../passwall.config .config
           make defconfig
           make oldconfig
-          make V=sc -j
+          make V=sc -j > /ccache/log.txt
           
       - name: Generate release tag
         id: tag
